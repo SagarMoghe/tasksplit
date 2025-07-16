@@ -1,6 +1,6 @@
 DELIMITER //
 
-CREATE PROCEDURE tasksplit.insert_recurrence_pattern(
+CREATE PROCEDURE tasksplit.sp_insert_recurrence_pattern(
     IN p_frequency ENUM('daily', 'weekly', 'monthly', 'yearly'),
     IN p_interval_value INT UNSIGNED,
     IN p_days_of_week SET('mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'),

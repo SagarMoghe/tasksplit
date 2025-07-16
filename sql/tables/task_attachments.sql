@@ -5,7 +5,6 @@ CREATE TABLE IF NOT EXISTS tasksplit.task_attachments (
                                   file_name VARCHAR(255) NOT NULL,
                                   file_path VARCHAR(512) NOT NULL,
                                   file_size BIGINT UNSIGNED NOT NULL,
-                                  mime_type VARCHAR(127),
                                   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
                                   FOREIGN KEY (task_id) REFERENCES tasks(task_id),
