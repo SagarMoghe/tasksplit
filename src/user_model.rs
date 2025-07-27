@@ -1,5 +1,5 @@
 use mysql::prelude::*;
-use mysql::{FromRowError, MySqlError, Row};
+use mysql::{FromRowError, MySqlError, PooledConn, Row};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,7 +40,7 @@ impl User {
         email: String,
         password_hash: String,
         phone: Option<String>,
-        profile_picture_url: Option<String>
+        profile_picture_url: Option<String>,
     ) -> Self {
         User {
             user_id: 0, // Will be set by database
@@ -82,19 +82,25 @@ impl User {
                   conn: &mut impl Queryable
     ) -> () {
         //Result<User, MySqlError>
-        let user_id = Self::insert_new_user(&self, conn).expect("TODO: panic message");
+        let user_id = Self::insert_new_user(self.first_name.to_string(), /* std::string::String */, /* std::string::String */, /* std::string::String */, /* std::option::Option<std::string::String> */, /* std::option::Option<std::string::String> */, conn).expect("TODO: panic message");
         self.user_id = user_id;
 
     }
 
-    fn insert_new_user(&self,
+    fn insert_new_user(
+                       first_name: String,
+                       last_name: String,
+                       email: String,
+                       password_hash: String,
+                       phone: Option<String>,
+                       profile_picture_url: Option<String>,
         conn: &mut impl Queryable,
 
     ) -> Result<u64, Box<dyn std::error::Error>> {
         // Execute the stored procedure
         conn.exec_drop(
             "CALL sp_insert_new_user(?, ?, ?, ?, ?, ?, @user_id)",
-            (&self.first_name, &self.last_name, &self.email, &self.password_hash, &self.phone, &self.profile_picture_url)
+            (first_name, last_name, email, password_hash, phone, profile_picture_url)
         )?;
 
         // Retrieve the output parameter
@@ -106,46 +112,32 @@ impl User {
         }
     }
 
-
-    // pub fn update(&self, conn: &mut impl Queryable) -> Result<(), MySqlError> {
-    //     conn.exec_drop(
-    //         "UPDATE users SET
-    //             first_name = ?,
-    //             last_name = ?,
-    //             email = ?,
-    //             status = ?
-    //         WHERE user_id = ?",
-    //         (
-    //             &self.first_name,
-    //             &self.last_name,
-    //             &self.email,
-    //             match self.status {
-    //                 UserStatus::Active => "active",
-    //                 UserStatus::Inactive => "inactive",
-    //                 UserStatus::Deleted => "deleted",
-    //             },
-    //             self.user_id,
-    //         )
-    //     )
-    // }
+    pub fn update(&self, conn: &mut impl Queryable) -> mysql::Result<()> {
+        conn.exec_drop(
+            "UPDATE users SET
+                first_name = ?,
+                last_name = ?,
+                email = ?,
+                status = ?,
+                phone = ?,
+                profile_picture_url = ?
+            WHERE user_id = ?",
+            (
+                &self.first_name,
+                &self.last_name,
+                &self.email,
+                match self.status {
+                    UserStatus::Active => "active",
+                    UserStatus::Inactive => "inactive",
+                    UserStatus::Deleted => "deleted",
+                },
+                &self.phone,
+                &self.profile_picture_url,
+                self.user_id,
+            )
+        )
+    }
 }
-
-// impl FromRow for User {
-//     fn from_row(row: Row) -> User {
-//         User {
-//             user_id: row.get("user_id").unwrap(),
-//             first_name: row.get("first_name").unwrap(),
-//             last_name: row.get("last_name").unwrap(),
-//             email: row.get("email").unwrap(),
-//             password_hash: row.get("password_hash").unwrap(),
-//             status: match row.get::<String, _>("status").unwrap().as_str() {
-//                 "active" => UserStatus::Active,
-//                 "inactive" => UserStatus::Inactive,
-//                 "deleted" => UserStatus::Deleted,
-//                 _ => UserStatus::Active,
-//             },
-//         }
-//     }
 
     impl FromRow for User {
         fn from_row(row: Row) -> Self {

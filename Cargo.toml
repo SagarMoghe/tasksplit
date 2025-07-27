@@ -1,0 +1,11 @@
+[package]
+name = "choresplit"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+mysql = "*"
+tokio = { version = "*", features = ["full"] }
+serde = { version = "*", features = ["derive"] }
+dotenv = "*"
+
