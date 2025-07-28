@@ -1,5 +1,5 @@
 use mysql::prelude::*;
-use mysql::{FromRowError, MySqlError, PooledConn, Row};
+use mysql::{FromRowError, PooledConn, Row};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,6 +33,11 @@ pub struct User {
     pub profile_picture_url: Option<String>,
 }
 
+pub struct UserWithConn {
+    pub user: User,
+    pub pooled_conn: PooledConn,
+}
+
 impl User {
     pub fn new(
         first_name: String,
@@ -57,63 +62,36 @@ impl User {
             profile_picture_url,
         }
     }
+}
 
-
-    pub fn full_name(&self) -> String {
-        format!("{} {}", self.first_name, self.last_name)
-    }
-
-    pub fn is_active(&self) -> bool {
-        matches!(self.status, UserStatus::Active)
-    }
-
-    // pub fn find_by_id(conn: &mut impl Queryable, id: u64) -> mysql::Result<Option<User>> {
-    //     conn.query_first(
-    //         format!("SELECT * FROM users WHERE user_id = {id}").as_str()
-    //     )
-    // }
-    //
-    // pub fn find_by_email(conn: &mut impl Queryable, email: &str) -> Result<Option<User>, MySqlError> {
-    //     conn.query_first(
-    //         format!("SELECT * FROM users WHERE email = {email} AND status = 'active'").as_str())
-    // }
-
-    pub fn create(&mut self,
-                  conn: &mut impl Queryable
-    ) -> () {
-        //Result<User, MySqlError>
-        let user_id = Self::insert_new_user(self.first_name.to_string(), /* std::string::String */, /* std::string::String */, /* std::string::String */, /* std::option::Option<std::string::String> */, /* std::option::Option<std::string::String> */, conn).expect("TODO: panic message");
-        self.user_id = user_id;
-
-    }
-
-    fn insert_new_user(
-                       first_name: String,
-                       last_name: String,
-                       email: String,
-                       password_hash: String,
-                       phone: Option<String>,
-                       profile_picture_url: Option<String>,
-        conn: &mut impl Queryable,
-
-    ) -> Result<u64, Box<dyn std::error::Error>> {
+impl UserWithConn {
+    pub fn insert_new_user(&mut self) -> Result<u64, Box<dyn std::error::Error>> {
         // Execute the stored procedure
-        conn.exec_drop(
+        self.pooled_conn.exec_drop(
             "CALL sp_insert_new_user(?, ?, ?, ?, ?, ?, @user_id)",
-            (first_name, last_name, email, password_hash, phone, profile_picture_url)
+            (
+                &self.user.first_name,
+                &self.user.last_name,
+                &self.user.email,
+                &self.user.password_hash,
+                &self.user.phone,
+                &self.user.profile_picture_url,
+            ),
         )?;
 
         // Retrieve the output parameter
-        let user_id: Option<u64> = conn.query_first("SELECT @user_id")?;
-
+        let user_id: Option<u64> = self.pooled_conn.query_first("SELECT @user_id")?;
         match user_id {
-            Some(id) if id != u64::MAX => Ok(id),
-            _ => Err("Failed to insert new user".into())
+            Some(id) if id != u64::MAX => {
+                self.user.user_id = id;
+                Ok(id)
+            }
+            _ => Err("Failed to insert new user".into()),
         }
     }
 
-    pub fn update(&self, conn: &mut impl Queryable) -> mysql::Result<()> {
-        conn.exec_drop(
+    pub fn update(&mut self) -> mysql::Result<()> {
+        self.pooled_conn.exec_drop(
             "UPDATE users SET
                 first_name = ?,
                 last_name = ?,
@@ -123,52 +101,44 @@ impl User {
                 profile_picture_url = ?
             WHERE user_id = ?",
             (
-                &self.first_name,
-                &self.last_name,
-                &self.email,
-                match self.status {
+                &self.user.first_name,
+                &self.user.last_name,
+                &self.user.email,
+                match self.user.status {
                     UserStatus::Active => "active",
                     UserStatus::Inactive => "inactive",
                     UserStatus::Deleted => "deleted",
                 },
-                &self.phone,
-                &self.profile_picture_url,
-                self.user_id,
-            )
+                &self.user.phone,
+                &self.user.profile_picture_url,
+                self.user.user_id,
+            ),
         )
     }
 }
 
-    impl FromRow for User {
-        fn from_row(row: Row) -> Self {
-            User {
-                user_id: row.get("user_id").unwrap(),
-                first_name: row.get("first_name").unwrap(),
-                last_name: row.get("last_name").unwrap(),
-                email: row.get("email").unwrap(),
-                password_hash: row.get("password_hash").unwrap(),
-                status: row.get::<String, _>("status")
-                    .map(|s| match s.as_str() {
-                        "active" => UserStatus::Active,
-                        "inactive" => UserStatus::Inactive,
-                        "deleted" => UserStatus::Deleted,
-                        _ => UserStatus::default(),
-                    })
-                    .unwrap(),
-                created_at: row.get("created_at").unwrap(),
-                updated_at: row.get("updated_at").unwrap(),
-                last_login_at: row.get("last_login_at").unwrap(),
-                email_verified_at: row.get("email_verified_at").unwrap(),
-                phone: row.get("phone").unwrap(),
-                profile_picture_url: row.get("profile_picture_url").unwrap(),
-            }
+impl FromRow for User {
+    fn from_row(row: Row) -> Self {
+        User {
+            user_id: 0,
+            first_name: "".to_string(),
+            last_name: "".to_string(),
+            email: "".to_string(),
+            password_hash: "".to_string(),
+            status: UserStatus::Active,
+            created_at: None,
+            updated_at: None,
+            last_login_at: None,
+            email_verified_at: None,
+            phone: None,
+            profile_picture_url: None,
         }
+    }
 
-        fn from_row_opt(row: Row) -> Result<Self, FromRowError>
-        where
-            Self: Sized
-        {
-            todo!()
-        }
-
+    fn from_row_opt(row: Row) -> Result<Self, FromRowError>
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
 }

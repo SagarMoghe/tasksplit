@@ -6,7 +6,6 @@ CREATE PROCEDURE tasksplit.sp_insert_task_attachment(
     IN p_file_name VARCHAR(255),
     IN p_file_path VARCHAR(512),
     IN p_file_size BIGINT UNSIGNED,
-    IN p_mime_type VARCHAR(127),
     OUT p_attachment_id BIGINT UNSIGNED
 )
 BEGIN
@@ -44,15 +43,13 @@ BEGIN
         uploaded_by,
         file_name,
         file_path,
-        file_size,
-        mime_type
+        file_size
     ) VALUES (
                  p_task_id,
                  p_uploaded_by,
                  p_file_name,
                  p_file_path,
-                 p_file_size,
-                 p_mime_type
+                 p_file_size
              );
 
     SET p_attachment_id = LAST_INSERT_ID();

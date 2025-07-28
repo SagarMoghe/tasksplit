@@ -13,7 +13,7 @@ BEGIN
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
         BEGIN
             ROLLBACK;
-            SET p_user_id = -1; -- Indicate error
+            SET p_user_id = 0; -- Indicate error
             SIGNAL SQLSTATE '45000'
                 SET MESSAGE_TEXT = 'Failed to insert new user';
         END;
